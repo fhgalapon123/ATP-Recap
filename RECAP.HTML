@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alfamart Logistics Academy — Distribution Center Operations</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Oswald:wght@500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --gold: #d99b00;
+      --gold-glow: rgba(217, 155, 0, 0.2);
+      --red: #e21a22;
+      --red-glow: rgba(226, 26, 34, 0.2);
+      --cyan: #0092b3;
+      --cyan-glow: rgba(0, 146, 179, 0.2);
+      --steel: #5a6e85;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --bg-surface: #edf1f6;
+      --bg-card: rgba(255, 255, 255, 0.92);
+      --bg-card-hover: #ffffff;
+      --border: rgba(15, 23, 42, 0.1);
+      --border-bright: rgba(15, 23, 42, 0.18);
+      --accent: var(--gold);
+      --accent-glow: var(--gold-glow);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    section { scroll-margin-top: 100px; }
+
+    body {
+      background-color: var(--bg-surface);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+      padding-bottom: 60px;
+      position: relative;
+    }
+
+    /* GLOBAL LOCKOUT BANNER FOR GOOGLE SITES SANDBOXES */
+    .global-lock-banner {
+      display: none;
+      background: var(--red);
+      color: #ffffff;
+      text-align: center;
+      padding: 12px 24px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 0.88rem;
+      letter-spacing: 1px;
+      position: sticky;
+      top: 0;
+      z-index: 99999;
+      box-shadow: 0 4px 15px rgba(226, 26, 34, 0.3);
+    }
+    .global-lock-banner.active { display: block; }
+
+    .lower-warehouse-backdrop {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    }
+    .wh-grid-moving {
+      position: absolute; inset: -100px;
+      background-image: 
+        linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      animation: moveGrid 12s linear infinite;
+    }
+    .wh-laser-beam {
+      position: absolute; top: 0; left: -100%; width: 100%; height: 3px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      box-shadow: 0 0 15px var(--accent);
+      animation: laserScan 6s ease-in-out infinite; opacity: 0.7;
+    }
+    .wh-perspective-lines {
+      position: absolute; inset: 0;
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="none"><g opacity="0.3"><path d="M0 1080 L960 300 L1920 1080" fill="none" stroke="%2394a3b8" stroke-width="1.5" stroke-dasharray="12 8"/><path d="M200 1080 L960 300 L1720 1080" fill="none" stroke="%23d99b00" stroke-width="2"/><path d="M400 1080 L960 300 L1520 1080" fill="none" stroke="%23cbd5e1" stroke-width="1.5"/></g></svg>');
+      background-size: cover; opacity: 0.6;
+    }
+
+    @keyframes moveGrid { 0% { transform: translateY(0); } 100% { transform: translateY(48px); } }
+    @keyframes laserScan { 0% { top: 15%; left: -100%; opacity: 0; } 20% { opacity: 0.8; } 80% { opacity: 0.8; } 100% { top: 95%; left: 100%; opacity: 0; } }
+
+    header, main, .dc-gate-overlay, .exam-modal-overlay, .media-modal-overlay, .hero-banner-outer { position: relative; z-index: 1; }
+
+    .dc-gate-overlay {
+      position: fixed; inset: 0; background: rgba(237, 241, 246, 0.92);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      z-index: 9999; display: flex; justify-content: center; align-items: center; padding: 24px;
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s;
+    }
+    .dc-gate-overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+    .dc-gate-card {
+      max-width: 640px; width: 100%; background: #ffffff; border: 1px solid var(--border-bright);
+      border-radius: 20px; padding: 40px 32px; text-align: center; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+    }
+    .dc-gate-logo { height: 52px; width: auto; margin-bottom: 20px; }
+    .dc-gate-title { font-family: 'Oswald', sans-serif; font-size: 2rem; letter-spacing: 1.5px; margin-bottom: 8px; color: var(--text-main); text-transform: uppercase; }
+    .dc-gate-sub { color: var(--text-muted); font-size: 0.92rem; margin-bottom: 32px; font-weight: 400; }
+
+    .dc-options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 580px) { .dc-options-grid { grid-template-columns: 1fr; } }
+
+    .dc-option-btn {
+      background: #f8fafc; border: 1px solid var(--border); border-radius: 14px; padding: 28px 20px;
+      cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 14px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); color: var(--text-main);
+    }
+    .dc-option-btn:hover { transform: translateY(-4px); }
+    .dc-option-btn.opt-dry:hover { border-color: var(--gold); box-shadow: 0 12px 25px rgba(217, 155, 0, 0.15); background: #ffffff; }
+    .dc-option-btn.opt-fresh:hover { border-color: var(--cyan); box-shadow: 0 12px 25px rgba(0, 146, 179, 0.15); background: #ffffff; }
+
+    .dc-icon { font-size: 2.8rem; line-height: 1; }
+    .dc-name { font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 700; letter-spacing: 1px; color: var(--text-main); }
+    .dc-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; }
+
+    .exam-modal-overlay {
+      position: fixed; inset: 0; background: rgba(237, 241, 246, 0.98); backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px); z-index: 10000; display: flex; justify-content: center;
+      align-items: center; padding: 24px; opacity: 0; visibility: hidden; pointer-events: none;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .exam-modal-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
+    .exam-modal-overlay.fullscreen-mode { padding: 0 !important; background: #ffffff; }
+
+    .exam-card {
+      max-width: 680px; width: 100%; max-height: 90vh; overflow-y: auto; background: #ffffff; border: 2px solid var(--red);
+      border-radius: 20px; padding: 32px; box-shadow: 0 25px 50px rgba(226, 26, 34, 0.12); position: relative;
+      transition: all 0.3s ease;
+    }
+    .exam-modal-overlay.fullscreen-mode .exam-card {
+      max-width: 100vw !important; width: 100vw !important; height: 100vh !important; max-height: 100vh !important;
+      border-radius: 0 !important; border: none !important; padding: 0 !important; box-shadow: none !important;
+    }
+
+    .modal-close-btn {
+      position: absolute; top: 18px; right: 20px; background: transparent; border: none;
+      color: var(--text-muted); font-size: 1.5rem; cursor: pointer; transition: color 0.2s; z-index: 10;
+    }
+    .modal-close-btn:hover { color: var(--text-main); }
+
+    .exam-step { display: none; text-align: center; }
+    .exam-step.active { display: block; }
+    .exam-step.fullscreen-step { height: 100vh; width: 100vw; position: relative; display: flex; flex-direction: column; }
+
+    .exam-step-tag {
+      font-family: 'Space Grotesk', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--red);
+      letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px;
+    }
+    .exam-title { font-family: 'Oswald', sans-serif; font-size: 2.2rem; letter-spacing: 1px; margin-bottom: 8px; color: var(--text-main); }
+    .exam-sub { color: var(--text-muted); font-size: 0.92rem; margin-bottom: 24px; font-weight: 400; }
+
+    .exam-summary-box {
+      background: #f1f5f9; border: 1px solid var(--border-bright); border-radius: 12px; padding: 20px;
+      margin-bottom: 24px; text-align: left;
+    }
+    .exam-summary-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.95rem; }
+    .exam-summary-row:last-child { margin-bottom: 0; }
+    .exam-summary-lbl { color: var(--text-muted); font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+    .exam-summary-val { font-weight: 700; color: var(--text-main); font-family: 'Oswald', sans-serif; letter-spacing: 0.5px; }
+
+    .floating-exam-actions {
+      position: absolute; top: 16px; right: 24px; z-index: 20; display: flex; gap: 12px; align-items: center;
+    }
+
+    .embedded-exam-wrapper-fullscreen {
+      width: 100%; height: 100%; position: relative; background: #ffffff;
+    }
+    .embedded-exam-wrapper-fullscreen iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+
+    .btn-group { display: flex; gap: 12px; justify-content: center; }
+    .btn-secondary {
+      background: #f1f5f9; border: 1px solid var(--border-bright); color: var(--text-main); padding: 12px 24px;
+      border-radius: 6px; font-family: 'Oswald', sans-serif; cursor: pointer; transition: all 0.2s; font-weight: 600;
+    }
+    .btn-secondary:hover { background: #e2e8f0; }
+
+    .media-modal-overlay {
+      position: fixed; inset: 0; background: rgba(237, 241, 246, 0.95); backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px); z-index: 10001; display: flex; justify-content: center;
+      align-items: center; padding: 24px; opacity: 0; visibility: hidden; pointer-events: none;
+      transition: all 0.3s ease;
+    }
+    .media-modal-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
+
+    .media-card {
+      max-width: 960px; width: 100%; background: #ffffff; border: 1px solid var(--border-bright);
+      border-radius: 16px; padding: 24px; box-shadow: 0 25px 50px rgba(15, 23, 42, 0.15); position: relative;
+    }
+
+    .media-frame-container {
+      position: relative; width: 100%; padding-top: 56.25%; border-radius: 8px; overflow: hidden; background: #000; margin-top: 16px;
+    }
+    .media-frame-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+
+    .complete-module-btn {
+      padding: 10px 20px; background: #10b981; color: #ffffff; border: none;
+      border-radius: 6px; font-family: 'Oswald', sans-serif; font-size: 0.95rem; font-weight: 700;
+      letter-spacing: 1px; cursor: pointer; transition: background 0.2s; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    .complete-module-btn:hover { background: #059669; }
+
+    header {
+      display: flex; justify-content: space-between; align-items: center; padding: 16px 32px;
+      background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    }
+
+    .brand-wrap { display: flex; align-items: center; gap: 14px; }
+    .brand-logo { height: 36px; width: auto; object-fit: contain; }
+    .brand { font-family: 'Oswald', sans-serif; font-size: 1.25rem; font-weight: 700; letter-spacing: 1px; color: var(--text-main); }
+
+    .active-dc-badge {
+      display: flex; align-items: center; gap: 8px; background: #f1f5f9; border: 1px solid var(--border-bright);
+      padding: 6px 16px; border-radius: 20px; font-size: 0.75rem; font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700; letter-spacing: 0.5px; color: var(--text-main); cursor: pointer; transition: all 0.25s ease;
+    }
+    .active-dc-badge:hover { background: #ffffff; border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+    .active-dc-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+    .exam-btn {
+      background: linear-gradient(135deg, #e21a22 0%, #b01017 100%); color: #fff; font-family: 'Oswald', sans-serif;
+      font-size: 1rem; font-weight: 700; letter-spacing: 1.5px; padding: 16px 36px; border-radius: 8px; border: none;
+      box-shadow: 0 6px 20px var(--red-glow); cursor: pointer; display: inline-flex; align-items: center; gap: 10px;
+      transition: all 0.25s ease; text-transform: uppercase;
+    }
+    .exam-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px var(--red-glow); filter: brightness(1.05); }
+    .exam-btn.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; filter: grayscale(1); }
+    .exam-btn.resume-mode { animation: pulseWarning 2s infinite; }
+
+    .bottom-exam-container {
+      margin-top: 48px;
+      padding: 32px;
+      background: #ffffff;
+      border: 1px solid var(--border-bright);
+      border-radius: 16px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+    }
+    .bottom-exam-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 1.8rem;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+    .bottom-exam-sub {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+
+    @keyframes pulseWarning {
+      0% { box-shadow: 0 0 0 0 rgba(226, 26, 34, 0.6); }
+      70% { box-shadow: 0 0 0 12px rgba(226, 26, 34, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(226, 26, 34, 0); }
+    }
+
+    .container { max-width: 1240px; margin: 0 auto; padding: 40px 24px; }
+
+    .hero-banner-outer {
+      position: relative; overflow: hidden; padding: 56px 32px; margin-bottom: 40px; border-bottom: 1px solid var(--border-bright);
+      background-color: #0b1120; background-image: url('https://lh3.googleusercontent.com/d/1nmquT1Sp8C4GsTbsyLBbeOyezIj2TSjD');
+      background-size: cover; background-position: center center; background-repeat: no-repeat;
+    }
+
+    .hero-banner-inner {
+      max-width: 1240px; margin: 0 auto; display: flex; flex-direction: row; align-items: center;
+      justify-content: space-between; gap: 40px;
+    }
+    @media (max-width: 868px) { .hero-banner-inner { flex-direction: column; text-align: center; } }
+
+    .hero-text-card {
+      background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 18px; padding: 32px 36px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4); max-width: 620px;
+    }
+
+    .academy-tag-wrap { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .hero-tag-logo { height: 22px; width: auto; object-fit: contain; }
+    .academy-tag { font-family: 'Space Grotesk', sans-serif; font-size: 0.82rem; font-weight: 700; letter-spacing: 2px; color: #94a3b8; text-transform: uppercase; }
+    .academy-tag span { color: var(--accent); }
+
+    .hero-title {
+      font-family: 'Oswald', sans-serif; font-size: 4.2rem; line-height: 0.95; letter-spacing: 1px;
+      text-transform: uppercase; margin-bottom: 16px; font-weight: 700; color: #ffffff; text-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+      cursor: pointer; display: inline-block; transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .hero-title:hover { opacity: 0.95; transform: translateY(-2px); }
+    .hero-title .highlight { color: #f59e0b; }
+    .hero-title .outline { color: transparent; -webkit-text-stroke: 1.5px #ffffff; }
+
+    .hero-scroll-trigger {
+      display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 6px 14px;
+      border-radius: 20px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #94a3b8; font-family: 'Space Grotesk', sans-serif; font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all 0.3s ease;
+    }
+    .hero-scroll-trigger:hover {
+      background: rgba(255, 255, 255, 0.12); color: #ffffff; border-color: var(--accent);
+      box-shadow: 0 0 15px var(--accent-glow); transform: translateY(2px);
+    }
+    .hero-scroll-trigger svg {
+      width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.5; fill: none;
+      animation: gentleBounce 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+    }
+
+    @keyframes gentleBounce {
+      0%, 100% { transform: translateY(0); opacity: 0.6; }
+      50% { transform: translateY(5px); opacity: 1; }
+    }
+
+    .hero-sub { color: #f1f5f9; font-size: 1.02rem; line-height: 1.65; font-weight: 400; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+
+    .hero-visual-wrapper { position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .main-3d-image { width: 100%; max-width: 460px; object-fit: contain; filter: drop-shadow(0 25px 35px rgba(0, 0, 0, 0.5)); transition: transform 0.4s ease; z-index: 2; }
+    .main-3d-image:hover { transform: scale(1.05); }
+
+    .role-section-wrapper {
+      background: var(--bg-card); border: 1px solid var(--border-bright); border-radius: 20px; padding: 32px 36px;
+      margin-bottom: 40px; max-width: 860px; margin-left: auto; margin-right: auto; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+    }
+    .role-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .role-section-title {
+      font-family: 'Space Grotesk', sans-serif; font-size: 0.9rem; font-weight: 700; letter-spacing: 2.5px;
+      text-transform: uppercase; background: linear-gradient(135deg, var(--accent) 0%, #b88200 100%); color: #ffffff;
+      padding: 6px 16px; border-radius: 6px; box-shadow: 0 4px 12px var(--accent-glow); display: inline-block;
+    }
+
+    .carousel-stage { display: flex; align-items: center; gap: 16px; position: relative; }
+    .carousel-nav-btn {
+      background: var(--accent); border: 2px solid var(--accent); width: 48px; height: 48px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.3rem; font-weight: bold;
+      color: #ffffff; transition: all 0.25s ease; box-shadow: 0 4px 14px var(--accent-glow); flex-shrink: 0; z-index: 10;
+    }
+    .carousel-nav-btn:hover { background: #ffffff; color: var(--accent); transform: scale(1.12); box-shadow: 0 6px 20px var(--accent-glow); }
+
+    .carousel-viewport { overflow: hidden; width: 100%; border-radius: 14px; flex-grow: 1; }
+    .role-carousel-track { display: flex; transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    .role-card {
+      flex: 0 0 100%; width: 100%; background: #ffffff; border: 2px solid var(--accent); border-radius: 14px;
+      padding: 20px; cursor: pointer; text-align: left; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      color: var(--text-main); box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05); display: flex; flex-direction: column; align-items: center;
+    }
+
+    .role-card-img-wrap { width: 100%; height: 340px; border-radius: 12px; overflow: hidden; margin-bottom: 18px; background: #f1f5f9; position: relative; }
+    .role-card-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s ease; }
+    .role-card:hover .role-card-img { transform: scale(1.02); }
+
+    .role-card-content { width: 100%; text-align: center; }
+    .role-card .role-title { font-family: 'Oswald', sans-serif; font-size: 1.35rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-main); }
+    .role-card .tier-tag { font-size: 0.8rem; color: var(--accent); margin-top: 4px; display: block; font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: 1px; }
+
+    .carousel-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); }
+    .carousel-dots { display: flex; gap: 8px; }
+    .dot-item { width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; cursor: pointer; transition: all 0.25s ease; }
+    .dot-item.active { width: 28px; border-radius: 10px; background: var(--accent); }
+
+    .cta-btn {
+      display: inline-flex; align-items: center; gap: 10px; background: var(--accent); color: #ffffff;
+      font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 1rem; letter-spacing: 1.5px; padding: 12px 28px;
+      border-radius: 6px; text-transform: uppercase; text-decoration: none; border: none; cursor: pointer;
+      box-shadow: 0 6px 18px var(--accent-glow); transition: all 0.25s ease;
+    }
+    .cta-btn:hover { transform: translateY(-2px); filter: brightness(1.05); box-shadow: 0 8px 22px var(--accent-glow); }
+
+    .modules-wrapper { display: none; opacity: 0; transition: opacity 0.4s ease-in-out; }
+    .modules-wrapper.visible { display: block; opacity: 1; }
+
+    .track-card {
+      background: var(--bg-card); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-bright); border-radius: 16px; padding: 32px; margin-bottom: 40px;
+      display: grid; grid-template-columns: 1fr 240px; gap: 32px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+    }
+    @media (max-width: 768px) { .track-card { grid-template-columns: 1fr; } }
+
+    .tier-badge { font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1.5px; color: var(--accent); }
+    .track-title { font-size: 2rem; margin: 6px 0 12px; font-family: 'Oswald', sans-serif; letter-spacing: 0.5px; color: var(--text-main); }
+    .track-text { color: var(--steel); font-size: 0.95rem; line-height: 1.6; margin-bottom: 0; font-weight: 400; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-self: center; }
+    .stat-item { background: #f8fafc; padding: 16px; border-radius: 12px; text-align: center; border: 1px solid var(--border); }
+    .stat-num { font-size: 2rem; font-weight: 700; font-family: 'Oswald', sans-serif; color: var(--text-main); }
+    .stat-lbl { font-size: 0.72rem; color: var(--steel); text-transform: uppercase; font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: 1px; }
+
+    .zones-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+
+    .zone {
+      background: var(--bg-card); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: 14px; padding: 24px; display: flex; flex-direction: column;
+      justify-content: space-between; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 4px 15px rgba(15, 23, 42, 0.03);
+      position: relative;
+    }
+    .zone.locked { opacity: 0.6; filter: grayscale(0.8); }
+    .zone.locked::after {
+      content: "🔒 LOCKED (Complete Previous Module)"; position: absolute; inset: 0; background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(2px); border-radius: 14px; display: flex; justify-content: center; align-items: center;
+      font-family: 'Oswald', sans-serif; font-weight: 700; color: var(--text-muted); font-size: 0.95rem; letter-spacing: 1px; z-index: 5;
+    }
+    .zone.blocked-exam { opacity: 0.5; }
+    .zone.blocked-exam .media-btn { pointer-events: none !important; opacity: 0.3 !important; }
+    .zone.blocked-exam::after {
+      content: "🚫 MODULE ACCESS SUSPENDED DURING EXAM"; position: absolute; inset: 0; background: rgba(226, 26, 34, 0.85);
+      border-radius: 14px; display: flex; justify-content: center; align-items: center; font-family: 'Oswald', sans-serif;
+      font-weight: 700; color: #ffffff; font-size: 1rem; letter-spacing: 1px; z-index: 5; pointer-events: auto !important;
+    }
+
+    .zone:hover {
+      border-color: var(--accent); transform: translateY(-6px);
+      box-shadow: 0 15px 30px rgba(15, 23, 42, 0.08), 0 0 15px var(--accent-glow); background: var(--bg-card-hover);
+    }
+    .zone .top { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
+    .zone .code { color: var(--accent); letter-spacing: 1px; }
+    .zone .lvl { text-transform: uppercase; background: #f1f5f9; padding: 4px 10px; border-radius: 20px; color: var(--steel); border: 1px solid var(--border); }
+    .zone h3 { font-size: 1.2rem; margin: 12px 0 8px; font-family: 'Oswald', sans-serif; display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text-main); }
+    .zone p { font-size: 0.88rem; color: var(--steel); margin-bottom: 16px; line-height: 1.5; flex-grow: 1; font-weight: 400; }
+    
+    .zone .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+    .zone .tags span { 
+      font-size: 0.72rem; 
+      font-family: 'Space Grotesk', sans-serif; 
+      background: rgba(15, 23, 42, 0.04); 
+      border: 1px solid var(--border-bright); 
+      padding: 4px 10px; 
+      border-radius: 6px; 
+      color: var(--text-main); 
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .media-buttons { display: flex; gap: 10px; margin-top: auto; }
+    .media-btn {
+      flex: 1; padding: 10px 14px; font-family: 'Oswald', sans-serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px;
+      border-radius: 6px; border: 1px solid var(--border-bright); background: #f8fafc; color: var(--text-main); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease; user-select: none;
+    }
+    .media-btn:hover { background: #ffffff; border-color: var(--accent); color: var(--accent); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .media-btn.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; border-color: transparent; background: #e2e8f0; }
+  </style>
+</head>
+<body>
+
+  <!-- GLOBAL MULTI-TAB LOCKOUT BANNER FOR GOOGLE SITES -->
+  <div class="global-lock-banner" id="globalLockBanner">
+    ⚠ AN ACTIVE EXAM IS CURRENTLY RUNNING IN ANOTHER TAB OR WINDOW. MODULE ACCESS IS SUSPENDED.
+  </div>
+
+  <div class="lower-warehouse-backdrop">
+    <div class="wh-grid-moving"></div>
+    <div class="wh-perspective-lines"></div>
+    <div class="wh-laser-beam"></div>
+  </div>
+
+  <!-- GATEKEEPER OVERLAY -->
+  <div class="dc-gate-overlay" id="dcGateOverlay" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+    <div class="dc-gate-card">
+      <img src="https://lh3.googleusercontent.com/d/1ztKblhilbAuUCf9Er6kmT6IXxS2I9cf1" alt="Alfamart Logistics Logo" class="dc-gate-logo" />
+      <h2 class="dc-gate-title" id="gateTitle">SELECT DISTRIBUTION CENTER</h2>
+      <p class="dc-gate-sub">Your learning modules will customize automatically based on your facility type.</p>
+
+      <div class="dc-options-grid">
+        <button class="dc-option-btn opt-dry" onclick="selectDC('dry')">
+          <div class="dc-icon">📦</div>
+          <div class="dc-name">DC DRY</div>
+          <div class="dc-desc">Ambient storage, high-density PTL/PDT picking, standard inventory & racking safety.</div>
+        </button>
+
+        <button class="dc-option-btn opt-fresh" onclick="selectDC('fresh')">
+          <div class="dc-icon">❄️</div>
+          <div class="dc-name">DC FRESH & FROZEN</div>
+          <div class="dc-desc">Cold chain management, chilled storage (-18°C / 2°C), FEFO rotation, & cold safety PPE.</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXAM MODAL OVERLAY -->
+  <div class="exam-modal-overlay" id="examModalOverlay" role="dialog" aria-modal="true" aria-labelledby="examModalTitle">
+    <div class="exam-card">
+      <button class="modal-close-btn" id="examModalCloseBtn" onclick="closeExamModal()" aria-label="Close modal">&times;</button>
+
+      <!-- STEP 1: DIRECT CONFIRMATION -->
+      <div class="exam-step active" id="examStep1">
+        <div class="exam-step-tag">READY TO START</div>
+        <h2 class="exam-title" id="examModalTitle">ASSESSMENT CONFIRMATION</h2>
+        <p class="exam-sub">Your evaluation will launch based on your active DC and selected role.</p>
+
+        <div class="exam-summary-box">
+          <div class="exam-summary-row">
+            <span class="exam-summary-lbl">Active DC Facility:</span>
+            <span class="exam-summary-val" id="summaryDC">-</span>
+          </div>
+          <div class="exam-summary-row">
+            <span class="exam-summary-lbl">Selected Position:</span>
+            <span class="exam-summary-val" id="summaryRole">-</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn-secondary" onclick="closeExamModal()">Cancel</button>
+          <button class="exam-btn" onclick="launchExamPortal()">
+            <span>LAUNCH FULLSCREEN EXAMINATION</span> 📝
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2: ACTIVE FULLSCREEN EXAM VIEW -->
+      <div class="exam-step fullscreen-step" id="examStep2">
+        <div class="floating-exam-actions">
+          <button class="complete-module-btn" onclick="restoreAccessAfterExam()">
+            ✓ COMPLETE & SUBMIT EXAM
+          </button>
+          <button class="btn-secondary" style="padding:10px 16px; background:rgba(15, 23, 42, 0.85); color:#fff; border-color:rgba(255,255,255,0.2); backdrop-filter:blur(8px);" onclick="closeExamModal()">
+            ✕ Minimize / Hide
+          </button>
+        </div>
+
+        <div class="embedded-exam-wrapper-fullscreen">
+          <iframe id="examPortalIframe" src="about:blank" title="Logistics Competency Assessment Form"></iframe>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MEDIA VIEWER MODAL -->
+  <div class="media-modal-overlay" id="mediaModalOverlay" role="dialog" aria-modal="true" aria-labelledby="mediaModalTitle">
+    <div class="media-card">
+      <button class="modal-close-btn" onclick="closeMediaModal()" aria-label="Close media viewer">&times;</button>
+      <h2 class="exam-title" id="mediaModalTitle" style="font-size:1.5rem; text-align:left;">Module Content</h2>
+      <div class="media-frame-container">
+        <iframe id="mediaIframe" src="" allow="autoplay; fullscreen" allowfullscreen></iframe>
+      </div>
+      <button class="complete-module-btn" id="markCompleteBtn" style="margin-top:16px; width:100%;" onclick="markActiveModuleComplete()">
+        ✓ MARK MODULE AS COMPLETED
+      </button>
+    </div>
+  </div>
+
+  <header>
+    <div class="brand-wrap">
+      <img src="https://lh3.googleusercontent.com/d/1ztKblhilbAuUCf9Er6kmT6IXxS2I9cf1" alt="Logo" class="brand-logo" />
+      <div class="brand">ALFAMART LOGISTICS ACADEMY</div>
+    </div>
+
+    <div class="active-dc-badge" onclick="openDCSwitcher()" role="button" tabindex="0" aria-label="Switch Active Distribution Center">
+      <div class="dot"></div>
+      <span id="activeDcText">DC DRY</span> ⚙️
+    </div>
+  </header>
+
+  <section class="hero-banner-outer" id="overview">
+    <div class="hero-banner-inner">
+      <div class="hero-text-card">
+        <div class="academy-tag-wrap">
+          <img src="https://lh3.googleusercontent.com/d/1ztKblhilbAuUCf9Er6kmT6IXxS2I9cf1" alt="Logo" class="hero-tag-logo" />
+          <div class="academy-tag" id="dcHeaderTag">
+            <span>◆</span> ALFAMART LOGISTICS ACADEMY · DC DRY
+          </div>
+        </div>
+        
+        <h1 class="hero-title" onclick="scrollToRoleSelection()" role="button" tabindex="0" aria-label="Scroll to role selection">
+          WAREHOUSE<br>
+          <span class="highlight">RE</span><span class="outline">CAP</span>
+        </h1>
+
+        <p class="hero-sub" id="dcHeroSub">
+          The Refresher Essentials and Competency Processes (RECAP) is a structured training initiative designed to strengthen the operational performance of warehouse employees. Modules unlock sequentially upon completing each topic.
+        </p>
+
+        <div class="hero-scroll-trigger" onclick="scrollToRoleSelection()" role="button" tabindex="0" aria-label="Scroll to role selection">
+          <span>Select Role</span>
+          <svg viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+        </div>
+      </div>
+
+      <div class="hero-visual-wrapper">
+        <img src="https://lh3.googleusercontent.com/d/1ncLxwV28B5GC-5M9chj3CXTpPLcy8ZSk" alt="Warehouse RECAP Seal" class="main-3d-image">
+      </div>
+    </div>
+  </section>
+
+  <main class="container">
+    <section class="role-section-wrapper" id="operationalRoleSection">
+      <div class="role-section-header">
+        <div class="role-section-title">SELECT YOUR OPERATIONAL ROLE</div>
+      </div>
+
+      <div class="carousel-stage">
+        <button class="carousel-nav-btn" onclick="moveCarousel(-1)" aria-label="Previous Role">&larr;</button>
+
+        <div class="carousel-viewport">
+          <div class="role-carousel-track" id="carouselTrack">
+            <div class="role-card" data-role="assistant" aria-pressed="true">
+              <div class="role-card-img-wrap">
+                <img src="https://lh3.googleusercontent.com/d/1n8BADQoIQeEdaRmboUZ_aOJ_KBgcOtU_" alt="Logistic Assistant Waving GIF" class="role-card-img" />
+              </div>
+              <div class="role-card-content">
+                <span class="role-title">LOGISTIC ASSISTANT</span>
+                <span class="tier-tag">RANK & FILE (TIER 1)</span>
+              </div>
+            </div>
+
+            <div class="role-card" data-role="supervisor" aria-pressed="false">
+              <div class="role-card-img-wrap">
+                <img src="https://lh3.googleusercontent.com/d/1iUqoRpan0UJ4gaI4g90MWYf01UpH_pHR" alt="Warehouse Supervisor" class="role-card-img" />
+              </div>
+              <div class="role-card-content">
+                <span class="role-title">WAREHOUSE SUPERVISOR</span>
+                <span class="tier-tag">TIER 2</span>
+              </div>
+            </div>
+
+            <div class="role-card" data-role="manager" aria-pressed="false">
+              <div class="role-card-img-wrap">
+                <img src="https://lh3.googleusercontent.com/d/10tjiTN20STqI4tagW44XZ5mWy94I_rGO" alt="Logistics DDCM / DCM" class="role-card-img" />
+              </div>
+              <div class="role-card-content">
+                <span class="role-title">LOGISTICS DDCM / DCM</span>
+                <span class="tier-tag">TIER 3</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="carousel-nav-btn" onclick="moveCarousel(1)" aria-label="Next Role">&rarr;</button>
+      </div>
+
+      <div class="carousel-footer">
+        <div class="carousel-dots" id="carouselDots">
+          <div class="dot-item active" onclick="goCarouselSlide(0)"></div>
+          <div class="dot-item" onclick="goCarouselSlide(1)"></div>
+          <div class="dot-item" onclick="goCarouselSlide(2)"></div>
+        </div>
+
+        <button onclick="revealAndScrollModules()" class="cta-btn" id="openTrackBtn">VIEW MODULES &rarr;</button>
+      </div>
+    </section>
+
+    <div class="modules-wrapper" id="modulesWrapper">
+      <section class="track-card">
+        <div>
+          <div class="tier-badge" id="ovTier"></div>
+          <h2 class="track-title" id="ovName"></h2>
+          <p class="track-text" id="ovText"></p>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-num" id="ovModules">0</div>
+            <div class="stat-lbl">Active Modules</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num" id="ovCert">1</div>
+            <div class="stat-lbl">Certificate</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="modules">
+        <div class="zones-grid" id="zones"></div>
+      </section>
+
+      <section class="bottom-exam-container">
+        <h3 class="bottom-exam-title">COMPETENCY EVALUATION</h3>
+        <p class="bottom-exam-sub" id="examRequirementText">Complete all module materials above to unlock your examination.</p>
+        <button class="exam-btn disabled" id="bottomExamBtn" onclick="openExamModal()">
+          <span id="bottomExamBtnText">TAKE EXAM</span> 📝
+        </button>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    let selectedDC = 'dry';
+    let currentRole = 'assistant';
+    let carouselIndex = 0;
+    let activeOpenedModuleCode = '';
+
+    let completedModules = {};
+    let isExamActive = false;
+    let heartbeatTimer = null;
+
+    const tabId = 'tab_' + Math.random().toString(36).substr(2, 9);
+    const examChannel = (typeof BroadcastChannel !== 'undefined') 
+      ? new BroadcastChannel('alfamart_exam_channel') 
+      : null;
+
+    // Cross-Domain Multi-Strategy Lock Engine for Google Sites
+    function setCookieLock(state) {
+      try {
+        const val = state ? '1' : '0';
+        document.cookie = `alfamart_exam_active=${val}; path=/; max-age=10`;
+      } catch(e) {}
+    }
+
+    function getCookieLock() {
+      try {
+        return document.cookie.split('; ').some(row => row.startsWith('alfamart_exam_active=1'));
+      } catch(e) {
+        return false;
+      }
+    }
+
+    function checkActiveExamState() {
+      const now = Date.now();
+      const storedState = localStorage.getItem('isExamActive') === 'true';
+      const storedTime = parseInt(localStorage.getItem('examHeartbeatTime') || '0', 10);
+      const cookieState = getCookieLock();
+      
+      const isHeartbeatValid = (now - storedTime) < 5000;
+      isExamActive = storedState || isHeartbeatValid || cookieState;
+
+      const lockBanner = document.getElementById('globalLockBanner');
+      if (lockBanner) {
+        if (isExamActive && !document.body.classList.contains('active-exam-owner')) {
+          lockBanner.classList.add('active');
+          closeMediaModal();
+        } else {
+          lockBanner.classList.remove('active');
+        }
+      }
+      renderModules();
+    }
+
+    function sendHeartbeat() {
+      if (document.body.classList.contains('active-exam-owner')) {
+        const now = Date.now();
+        localStorage.setItem('isExamActive', 'true');
+        localStorage.setItem('examHeartbeatTime', now.toString());
+        setCookieLock(true);
+
+        const payload = { type: 'ALFAMART_EXAM_HEARTBEAT', time: now, owner: tabId };
+        
+        if (examChannel) {
+          examChannel.postMessage(payload);
+        }
+
+        // Post up to Google Sites top/parent wrapper window
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(payload, '*');
+          }
+          if (window.top && window.top !== window) {
+            window.top.postMessage(payload, '*');
+          }
+        } catch(e) {}
+      }
+    }
+
+    // Continuous heartbeat & tab verification loop
+    setInterval(function() {
+      if (!document.body.classList.contains('active-exam-owner')) {
+        checkActiveExamState();
+      }
+    }, 1000);
+
+    // Cross-Window and Cross-Frame messaging listeners
+    window.addEventListener('message', function(event) {
+      if (event.data && (event.data.type === 'ALFAMART_EXAM_STATE' || event.data.type === 'ALFAMART_EXAM_HEARTBEAT')) {
+        if (event.data.owner !== tabId) {
+          localStorage.setItem('examHeartbeatTime', Date.now().toString());
+          localStorage.setItem('isExamActive', 'true');
+          setCookieLock(true);
+          checkActiveExamState();
+        }
+      }
+    });
+
+    window.addEventListener('storage', function(e) {
+      if (e.key === 'isExamActive' || e.key === 'examHeartbeatTime') {
+        checkActiveExamState();
+      }
+    });
+
+    if (examChannel) {
+      examChannel.onmessage = function(event) {
+        if (event.data && event.data.owner !== tabId) {
+          localStorage.setItem('examHeartbeatTime', Date.now().toString());
+          localStorage.setItem('isExamActive', 'true');
+          setCookieLock(true);
+          checkActiveExamState();
+        }
+      };
+    }
+
+    window.addEventListener('beforeunload', function() {
+      if (document.body.classList.contains('active-exam-owner')) {
+        localStorage.removeItem('isExamActive');
+        localStorage.removeItem('examHeartbeatTime');
+        setCookieLock(false);
+        const exitPayload = { type: 'EXAM_ENDED', owner: tabId };
+        if (examChannel) examChannel.postMessage(exitPayload);
+        try {
+          window.parent.postMessage(exitPayload, '*');
+          window.top.postMessage(exitPayload, '*');
+        } catch(e) {}
+      }
+    });
+
+    const EXAM_LINKS = {
+      dry: {
+        assistant: 'https://forms.gle/UB2rMoMvT7CX1DnG8',
+        supervisor: 'https://forms.gle/Ltvvpj8VDj3Rz6QN6',
+        manager: ''
+      },
+      fresh: {
+        assistant: 'https://forms.gle/5eCSdwTCxwUfLkQC7',
+        supervisor: 'https://forms.gle/HFNSFnvGMFquKhUd7',
+        manager: ''
+      }
+    };
+
+    function formatSlideUrl(url) {
+      if (!url) return '';
+      if (url.includes('/pub')) return url;
+      return url.replace(/\/edit.*$/, '/embed?start=false&loop=false&delayms=3000');
+    }
+
+    const MODULE_DATABASE = [
+      {
+        code: 'Z-01', icon: 'shield', 
+        title: { dry: 'General Flow of Warehouse Operations', fresh: 'Supply Chain, Logistics' }, 
+        level: 'Core',
+        dc: ['dry', 'fresh'], roles: ['assistant', 'supervisor'],
+        blurb: {
+          dry: 'Master end-to-end warehouse operational flow covering inbound receiving, putaway, order picking, and outbound dispatch.',
+          fresh: 'Understand cold chain supply networks, temperature-controlled logistics, and distribution center node coordination.'
+        },
+        tags: { 
+          dry: ['InboundFlow', 'Putaway', 'OutboundDispatch'], 
+          fresh: ['SupplyChain', 'ColdChainLogistics', 'DCNetwork'] 
+        },
+        slideUrl: { dry: 'https://docs.google.com/presentation/d/1_AX8oDQeokb_PncRgoynIzsArFYK2IatjSh11w8vUGU/embed?start=false&loop=false&delayms=3000', fresh: 'https://docs.google.com/presentation/d/1Cu9q54RK4CRLQtZSg6X9BbvgxzgIoV21yVU2UqroGRE/embed?start=false&loop=false&delayms=3000' },
+        videoUrl: { dry: 'https://drive.google.com/file/d/1m8XmEIVm7j222K3-gizgjpzje5aKkjXS/preview', fresh: 'https://drive.google.com/file/d/1dZ0ynczHu_j-sdExjSANJ-cXKJJpP5Ck/preview' }
+      },
+      {
+        code: 'Z-03', icon: 'scan', 
+        title: { dry: 'Warehouse Expectation & KPI Targets', fresh: 'Man Power' }, 
+        level: 'Core',
+        dc: ['dry', 'fresh'], roles: ['assistant', 'supervisor', 'manager'],
+        blurb: {
+          dry: 'Learn operational KPI expectations, performance benchmarks (DCPI), and accuracy metrics required across warehouse shifts.',
+          fresh: 'Manage shift manpower allocation, workforce productivity targets, and labor planning across cold storage zones.'
+        },
+        tags: { 
+          dry: ['KPITargets', 'DCPIPerformance', 'WASAccuracy'], 
+          fresh: ['ShiftManning', 'LaborProductivity', 'WorkforcePlanning'] 
+        },
+        slideUrl: { dry: 'https://docs.google.com/presentation/d/1ueeKFuubVIM118hB8-GABN0UkZbJOnWCjempXTGNSXU/embed?start=false&loop=false&delayms=3000', fresh: 'https://docs.google.com/presentation/d/1fQU-YvV1bqSzFTTJEhhjHzCewX29J8hh11Km5pGu8G8/embed?start=false&loop=false&delayms=3000' },
+        videoUrl: { dry: 'https://drive.google.com/file/d/1FgHgUNCI6H3mdI3agCi8wrTOV5fDDGkd/preview', fresh: 'https://drive.google.com/file/d/1OqksyLfZNpN_0qzoscaP61-FV-SRULx0/preview' }
+      },
+      {
+        code: 'Z-04', icon: 'check', title: 'PTL System (Pick-to-Light)', level: 'Rank & File',
+        dc: ['dry'], roles: ['assistant', 'supervisor'],
+        blurb: 'Operate stationary light-directed picking modules for rapid high-velocity item fulfillment.',
+        tags: { dry: ['PickToLight', 'FixedZonePicking', 'HighVelocityPick'] },
+        slideUrl: '', videoUrl: 'https://drive.google.com/file/d/1b7G0NoNtidLaD1WxgyXIzswLyptG5AhE/preview'
+      },
+      {
+        code: 'Z-05', icon: 'scan', title: 'PDT System (Portable Data Terminal)', level: 'Rank & File',
+        dc: ['dry'], roles: ['assistant', 'supervisor'],
+        blurb: 'Utilize handheld RF scanning devices for mobile barcode verification, inventory putaway, and picking accuracy.',
+        tags: { dry: ['BarcodeScanning', 'WMSMobile', 'InventoryAccuracy'] },
+        slideUrl: 'https://docs.google.com/presentation/d/1Ljl_THntS4h2vID_o-XAW9YacJfOSfCFDXjaySlj0DY/embed?start=false&loop=false&delayms=3000',
+        videoUrl: 'https://drive.google.com/file/d/1ZtKUjo9m9KJuNaw-xK2BONINua5uWKe2/preview'
+      },
+      {
+        code: 'Z-06', icon: 'chart', title: 'Managerial Function: Planning', level: 'Executive',
+        dc: ['dry', 'fresh'], roles: ['manager'],
+        blurb: 'Establish strategic volume forecasts, facility layout planning, and long-term resource allocation models.',
+        tags: { 
+          dry: ['CapacityPlanning', 'ResourceAllocation', 'StrategicForecasting'], 
+          fresh: ['CapacityPlanning', 'ResourceAllocation', 'StrategicForecasting'] 
+        },
+        slideUrl: 'https://docs.google.com/presentation/d/1fPLphbMGgykJ07ebS7paRc7kveT_NnrUsspxuDBTqiw/embed?start=false&loop=false&delayms=3000',
+        videoUrl: 'https://drive.google.com/file/d/1OLFvjyzQDrGXN2VrWRa0SUK9CUz48ggT/preview'
+      },
+      {
+        code: 'Z-07', icon: 'gear', title: 'Managerial Function: Organizing', level: 'Executive',
+        dc: ['dry', 'fresh'], roles: ['manager'],
+        blurb: 'Structure operational workflows, delegate shift responsibilities, and optimize warehouse slotting strategies.',
+        tags: { 
+          dry: ['WorkflowStructure', 'ShiftDelegation', 'SlottingOptimization'], 
+          fresh: ['WorkflowStructure', 'ShiftDelegation', 'SlottingOptimization'] 
+        },
+        slideUrl: 'https://docs.google.com/presentation/d/1Fv_mtxOBtevhhrkPagGJvlC8noOQz_O9rNz-01zlRnc/embed?start=false&loop=false&delayms=3000',
+        videoUrl: 'https://drive.google.com/file/d/1_jXakg6qyio_QsF1eN5BWFtrmqn4OnXG/preview'
+      },
+      {
+        code: 'Z-08', icon: 'people', title: 'Managerial Function: Leading', level: 'Executive',
+        dc: ['dry', 'fresh'], roles: ['manager'],
+        blurb: 'Motivate warehouse supervisors, foster a strong floor safety culture, and lead operational team success.',
+        tags: { 
+          dry: ['TeamMotivation', 'OperationalLeadership', 'SafetyCulture'], 
+          fresh: ['TeamMotivation', 'OperationalLeadership', 'SafetyCulture'] 
+        },
+        slideUrl: 'https://docs.google.com/presentation/d/1ZvTTgU8kAyrxwCsrYXKFBRCMH7i0Po2o8FQPryCL-SM/embed?start=false&loop=false&delayms=3000',
+        videoUrl: 'https://drive.google.com/file/d/1HpXXnxsYGKQzkCMU704Q4vBZp8sPFq4u/preview'
+      },
+      {
+        code: 'Z-09', icon: 'check', title: 'Managerial Function: Controlling', level: 'Executive',
+        dc: ['dry', 'fresh'], roles: ['manager'],
+        blurb: 'Monitor inventory control metrics, audit operational quality, and execute shrinkage prevention standards.',
+        tags: { 
+          dry: ['KPITracking', 'QualityAudits', 'LossPrevention'], 
+          fresh: ['KPITracking', 'QualityAudits', 'LossPrevention'] 
+        },
+        slideUrl: 'https://docs.google.com/presentation/d/1p9eHqycN2NcxHrpgvtqQ27_xGU0VZ1bKpFK02_OSFaU/embed?start=false&loop=false&delayms=3000',
+        videoUrl: 'https://drive.google.com/file/d/16ivLBiQAhShjXe883jWOrZw6gTlByknN/preview'
+      },
+      {
+        code: 'Z-10', icon: 'shield', title: 'Warehouse Safety', level: 'Supervisor',
+        dc: ['dry', 'fresh'], roles: ['supervisor'],
+        blurb: {
+          dry: 'Conduct floor safety audits, identify operational hazards, and enforce incident reporting protocols.',
+          fresh: 'Enforce cold-storage PPE rules, slip-and-fall hazard controls, and emergency response procedures.'
+        },
+        tags: { 
+          dry: ['SafetyAudits', 'HazardID', 'IncidentReporting'], 
+          fresh: ['ColdSafetyPPE', 'SlipFallPrevention', 'EmergencySOP'] 
+        },
+        slideUrl: { dry: 'https://docs.google.com/presentation/d/19yT9JEuCRAebVPQ4ifPySKWbch0NfCFmmcMd2a2h4t0/embed?start=false&loop=false&delayms=3000', fresh: 'https://docs.google.com/presentation/d/19yT9JEuCRAebVPQ4ifPySKWbch0NfCFmmcMd2a2h4t0/embed?start=false&loop=false&delayms=3000' }, 
+        videoUrl: 'https://drive.google.com/file/d/1D1239zXdTADb7_9XIfJTZPITJAYUFeEO/preview'
+      },
+      {
+        code: 'Z-11', icon: 'box', 
+        title: { dry: 'Basic Product Knowledge', fresh: 'Machine And Equipment' }, 
+        level: 'Core',
+        dc: ['dry', 'fresh'], roles: ['assistant', 'supervisor'],
+        blurb: {
+          dry: 'Identify SKU classifications, master fragile merchandise handling, and verify outer carton packaging standards.',
+          fresh: 'Operate cold-storage material handling equipment (MHE), manage fleet maintenance, and enforce forklift safety.'
+        },
+        tags: { 
+          dry: ['SKUIdentifiers', 'FragileHandling', 'PackagingStandards'], 
+          fresh: ['ColdStorageMHE', 'EquipmentMaintenance', 'ForkliftSafety'] 
+        },
+        slideUrl: { dry: 'https://docs.google.com/presentation/d/13d5BEdswFpVXGmMHnit7p1mcqhCC5BfTRAYWV0K8W9Y/embed?start=false&loop=false&delayms=3000', fresh: 'https://docs.google.com/presentation/d/10m20bOxdS3VXw6Zzq0aobzA0bJCOoTbkf-k0EgD-Fos/embed?start=false&loop=false&delayms=3000' },
+        videoUrl: { dry: 'https://drive.google.com/file/d/11_tvSEgoxvSJALpti72733RmAzYSe4DT/preview', fresh: 'https://drive.google.com/file/d/1yV-gMDQdjfF9P_IF0PT073X35s6qQmIj/preview' }
+      },
+      {
+        code: 'Z-12', icon: 'truck', 
+        title: { dry: 'Loading Process', fresh: 'Methods or Systems, Processes and Procedures' }, 
+        level: 'Rank & File',
+        dc: ['dry', 'fresh'], roles: ['assistant', 'supervisor'],
+        blurb: {
+          dry: 'Perform dock safety checks, inspect delivery vehicles, and balance trailer weight distribution prior to dispatch.',
+          fresh: 'Maintain strict FEFO stock rotation, verify chilled receiving temperatures, and adhere to cold chain SOPs.'
+        },
+        tags: { 
+          dry: ['DockSafety', 'VehicleInspection', 'WeightDistribution'], 
+          fresh: ['FEFORotation', 'ChilledReceiving', 'SOPCompliance'] 
+        },
+        slideUrl: { dry: 'https://docs.google.com/presentation/d/18hZmJ9soZuOnxA_WEG7IqlLl6texIkWQwwb-I73XyGE/embed?start=false&loop=false&delayms=3000', fresh: 'https://docs.google.com/presentation/d/1NrvtOyd2Siji6IIe43tW70BsUIA7j7bTc89gOyoMydw/embed?start=false&loop=false&delayms=3000' },
+        videoUrl: { dry: 'https://drive.google.com/file/d/1mCTLNLhB4iUQPRKBOwamZI75iiSE_9a3/preview', fresh: 'https://drive.google.com/file/d/1vVhSOcIkzqXcHmN63NnqxOBJhrYo3GYK/preview' }
+      }
+    ];
+
+    const ROLE_DETAILS = {
+      assistant: { name: 'Logistic Assistant', tier: 'Rank & File (Tier 1)', desc: 'Hands-on operational execution: picking, putaway, FEFO/FIFO rotation, and equipment usage.' },
+      supervisor: { name: 'Warehouse Supervisor', tier: 'Supervisor (Tier 2)', desc: 'Shift leadership: throughput monitoring, cold chain/ racker compliance, labor allocation, and exceptions.' },
+      manager: { name: 'Logistics DDCM / DCM', tier: 'Site Manager (Tier 3)', desc: 'Site leadership: operational governance, budget management, capacity planning, and SLA fulfillment.' }
+    };
+
+    const ICONS = {
+      box: '<path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10"/>',
+      scan: '<path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M3 12h18"/>',
+      shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/>',
+      check: '<path d="M9 11l3 3 8-8M21 12a9 9 0 11-6-8.5"/>',
+      chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+      truck: '<path d="M3 6h11v9H3zM14 9h4l3 3v3h-7zM7 18a2 2 0 100 .01M17 18a2 2 0 100 .01"/>',
+      people: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 11a3 3 0 100-6M21 20c0-2.5-1.5-4.6-4-5.5"/>',
+      gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M7 17l-2 2"/>'
+    };
+
+    function ic(k) { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">${ICONS[k] || ICONS.box}</svg>`; }
+
+    function moveCarousel(direction) {
+      const cards = document.querySelectorAll('.role-card');
+      carouselIndex += direction;
+      if (carouselIndex < 0) carouselIndex = cards.length - 1;
+      if (carouselIndex >= cards.length) carouselIndex = 0;
+      goCarouselSlide(carouselIndex);
+    }
+
+    function goCarouselSlide(slideIndex) {
+      carouselIndex = slideIndex;
+      const track = document.getElementById('carouselTrack');
+      const cards = document.querySelectorAll('.role-card');
+      const dots = document.querySelectorAll('.dot-item');
+
+      track.style.transform = `translateX(-${carouselIndex * 100}%)`;
+      cards.forEach((card, idx) => {
+        const isSelected = idx === carouselIndex;
+        card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+        if (isSelected) currentRole = card.dataset.role;
+      });
+      dots.forEach((dot, idx) => dot.classList.toggle('active', idx === carouselIndex));
+
+      hideModules();
+      renderModules();
+    }
+
+    function revealAndScrollModules() {
+      const wrapper = document.getElementById('modulesWrapper');
+      wrapper.classList.add('visible');
+      setTimeout(() => {
+        const target = document.getElementById('modulesWrapper');
+        if (target) {
+          const offsetPosition = target.getBoundingClientRect().top + window.pageYOffset - 100;
+          window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+        }
+      }, 50);
+    }
+
+    function hideModules() {
+      document.getElementById('modulesWrapper').classList.remove('visible');
+    }
+
+    function scrollToRoleSelection() {
+      const target = document.getElementById('operationalRoleSection');
+      if (target) {
+        const offsetPosition = target.getBoundingClientRect().top + window.pageYOffset - 100;
+        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+      }
+    }
+
+    function selectDC(dcType) {
+      selectedDC = dcType;
+      document.getElementById('dcGateOverlay').classList.add('hidden');
+      hideModules();
+
+      const root = document.documentElement;
+      const activeText = document.getElementById('activeDcText');
+      const tagHeader = document.getElementById('dcHeaderTag');
+
+      if (dcType === 'fresh') {
+        root.style.setProperty('--accent', '#0092b3');
+        root.style.setProperty('--accent-glow', 'rgba(0, 146, 179, 0.2)');
+        activeText.innerText = 'DC FRESH & FROZEN';
+        tagHeader.innerHTML = '<span>◆</span> ALFAMART LOGISTICS ACADEMY · DC FRESH & FROZEN';
+      } else {
+        root.style.setProperty('--accent', '#d99b00');
+        root.style.setProperty('--accent-glow', 'rgba(217, 155, 0, 0.2)');
+        activeText.innerText = 'DC DRY';
+        tagHeader.innerHTML = '<span>◆</span> ALFAMART LOGISTICS ACADEMY · DC DRY';
+      }
+
+      renderModules();
+    }
+
+    function openDCSwitcher() {
+      document.getElementById('dcGateOverlay').classList.remove('hidden');
+    }
+
+    function openMediaModalByCode(code, type) {
+      if (isExamActive) return false;
+
+      const mod = MODULE_DATABASE.find(m => m.code === code);
+      if (!mod) return false;
+
+      const displayTitle = typeof mod.title === 'object' ? (mod.title[selectedDC] || mod.title.dry) : mod.title;
+      let rawUrl = type === 'slide' 
+        ? (typeof mod.slideUrl === 'object' ? (mod.slideUrl[selectedDC] || mod.slideUrl.dry) : mod.slideUrl)
+        : (typeof mod.videoUrl === 'object' ? (mod.videoUrl[selectedDC] || mod.videoUrl.dry) : mod.videoUrl);
+
+      if (!rawUrl) return false;
+
+      if (type === 'slide') {
+        rawUrl = formatSlideUrl(rawUrl);
+      }
+
+      activeOpenedModuleCode = code;
+      document.getElementById('mediaModalTitle').innerText = `${displayTitle} - ${type === 'slide' ? 'Slides' : 'Video'}`;
+      document.getElementById('mediaIframe').src = rawUrl;
+      document.getElementById('mediaModalOverlay').classList.add('active');
+    }
+
+    function markActiveModuleComplete() {
+      if (activeOpenedModuleCode) {
+        completedModules[`${selectedDC}_${currentRole}_${activeOpenedModuleCode}`] = true;
+        closeMediaModal();
+        renderModules();
+      }
+    }
+
+    function closeMediaModal() {
+      const overlay = document.getElementById('mediaModalOverlay');
+      const iframe = document.getElementById('mediaIframe');
+      if (overlay) overlay.classList.remove('active');
+      if (iframe) iframe.src = '';
+    }
+
+    function openExamModal() {
+      if (isExamActive) {
+        setExamStep(2);
+      } else {
+        const dcLabel = selectedDC === 'fresh' ? 'DC Fresh & Frozen' : 'DC Dry';
+        const roleLabel = ROLE_DETAILS[currentRole].name;
+        document.getElementById('summaryDC').innerText = dcLabel;
+        document.getElementById('summaryRole').innerText = roleLabel;
+        setExamStep(1);
+      }
+      document.getElementById('examModalOverlay').classList.add('active');
+    }
+
+    function closeExamModal() {
+      document.getElementById('examModalOverlay').classList.remove('active');
+      document.getElementById('examModalOverlay').classList.remove('fullscreen-mode');
+    }
+
+    function setExamStep(stepNum) {
+      document.querySelectorAll('.exam-step').forEach(step => step.classList.remove('active'));
+      document.getElementById(`examStep${stepNum}`).classList.add('active');
+
+      const modalOverlay = document.getElementById('examModalOverlay');
+      const closeBtn = document.getElementById('examModalCloseBtn');
+
+      if (stepNum === 2) {
+        modalOverlay.classList.add('fullscreen-mode');
+        closeBtn.style.display = 'none';
+      } else {
+        modalOverlay.classList.remove('fullscreen-mode');
+        closeBtn.style.display = 'block';
+      }
+    }
+
+    function launchExamPortal() {
+      document.body.classList.add('active-exam-owner');
+      isExamActive = true;
+
+      sendHeartbeat();
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(sendHeartbeat, 1000);
+
+      renderModules();
+
+      const examUrl = EXAM_LINKS[selectedDC] ? EXAM_LINKS[selectedDC][currentRole] : null;
+      if (examUrl) {
+        document.getElementById('examPortalIframe').src = examUrl;
+      }
+
+      setExamStep(2);
+    }
+
+    function restoreAccessAfterExam() {
+      document.body.classList.remove('active-exam-owner');
+      isExamActive = false;
+
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      localStorage.removeItem('isExamActive');
+      localStorage.removeItem('examHeartbeatTime');
+      setCookieLock(false);
+
+      const exitPayload = { type: 'EXAM_ENDED', owner: tabId };
+      if (examChannel) examChannel.postMessage(exitPayload);
+      try {
+        window.parent.postMessage(exitPayload, '*');
+        window.top.postMessage(exitPayload, '*');
+      } catch(e) {}
+
+      document.getElementById('examPortalIframe').src = 'about:blank';
+      closeExamModal();
+      checkActiveExamState();
+    }
+
+    function renderModules() {
+      const container = document.getElementById('zones');
+      const filtered = MODULE_DATABASE.filter(m => m.dc.includes(selectedDC) && m.roles.includes(currentRole));
+      
+      let allCompleted = true;
+
+      container.innerHTML = filtered.map((m, index) => {
+        const displayTitle = typeof m.title === 'object' ? (m.title[selectedDC] || m.title.dry) : m.title;
+        const displayBlurb = typeof m.blurb === 'object' ? (m.blurb[selectedDC] || m.blurb.dry) : m.blurb;
+        const slideLink = typeof m.slideUrl === 'object' ? (m.slideUrl[selectedDC] || m.slideUrl.dry) : m.slideUrl;
+        const videoLink = typeof m.videoUrl === 'object' ? (m.videoUrl[selectedDC] || m.videoUrl.dry) : m.videoUrl;
+        
+        const moduleTags = typeof m.tags === 'object' && !Array.isArray(m.tags) ? (m.tags[selectedDC] || m.tags.dry || []) : (m.tags || []);
+
+        const isCurrentCompleted = completedModules[`${selectedDC}_${currentRole}_${m.code}`];
+        const isPrevCompleted = index === 0 || completedModules[`${selectedDC}_${currentRole}_${filtered[index - 1].code}`];
+        const isLocked = !isPrevCompleted && !isCurrentCompleted;
+
+        if (!isCurrentCompleted) allCompleted = false;
+
+        let zoneClasses = 'zone';
+        if (isExamActive) zoneClasses += ' blocked-exam';
+        else if (isLocked) zoneClasses += ' locked';
+
+        return `
+          <div class="${zoneClasses}">
+            <div class="top">
+              <span class="code">${m.code} ${isCurrentCompleted ? '✓' : ''}</span>
+              <span class="lvl">${m.level}</span>
+            </div>
+            <h3>${ic(m.icon)} ${displayTitle}</h3>
+            <p>${displayBlurb}</p>
+            <div class="tags">
+              ${moduleTags.map(t => `<span>#${t}</span>`).join('')}
+            </div>
+            <div class="media-buttons">
+              <button 
+                type="button" 
+                class="media-btn ${!slideLink || isLocked || isExamActive ? 'disabled' : ''}" 
+                onclick="if(!isExamActive){openMediaModalByCode('${m.code}', 'slide')}"
+                onauxclick="return false;"
+                oncontextmenu="return false;">
+                📊 Slides
+              </button>
+              <button 
+                type="button" 
+                class="media-btn ${!videoLink || isLocked || isExamActive ? 'disabled' : ''}" 
+                onclick="if(!isExamActive){openMediaModalByCode('${m.code}', 'video')}"
+                onauxclick="return false;"
+                oncontextmenu="return false;">
+                ▶ Video
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const bottomExamBtn = document.getElementById('bottomExamBtn');
+      const bottomExamBtnText = document.getElementById('bottomExamBtnText');
+      const examRequirementText = document.getElementById('examRequirementText');
+
+      if (isExamActive) {
+        bottomExamBtn.classList.remove('disabled');
+        bottomExamBtn.classList.add('resume-mode');
+        bottomExamBtnText.innerText = 'RE-ENTER / RESUME EXAM';
+        examRequirementText.innerText = 'An exam is currently active in full-screen mode.';
+      } else if (allCompleted) {
+        bottomExamBtn.classList.remove('disabled');
+        bottomExamBtn.classList.remove('resume-mode');
+        bottomExamBtnText.innerText = 'TAKE EXAM';
+        examRequirementText.innerText = 'All modules completed! You are ready to take your evaluation.';
+      } else {
+        bottomExamBtn.classList.add('disabled');
+        bottomExamBtn.classList.remove('resume-mode');
+        bottomExamBtnText.innerText = 'TAKE EXAM';
+        examRequirementText.innerText = 'Complete all module materials above to unlock your evaluation.';
+      }
+
+      const rDetail = ROLE_DETAILS[currentRole];
+      document.getElementById('ovTier').innerText = `${selectedDC.toUpperCase()} · ${rDetail.tier}`;
+      document.getElementById('ovName').innerText = rDetail.name;
+      document.getElementById('ovText').innerText = rDetail.desc;
+      document.getElementById('ovModules').innerText = filtered.length;
+    }
+
+    checkActiveExamState();
+  </script>
+</body>
+</html>
